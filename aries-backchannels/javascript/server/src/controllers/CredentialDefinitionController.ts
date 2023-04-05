@@ -4,7 +4,7 @@ import { BaseController } from '../BaseController'
 import { TestHarnessConfig } from '../TestHarnessConfig'
 import { AnonCredsApi, AnonCredsCredentialDefinition, AnonCredsCredentialDefinitionRepository } from '@aries-framework/anoncreds'
 import { DidInfo } from '../types'
-
+import { parseCredentialDefinitionId, getLegacyCredentialDefinitionId, parseSchemaId, getLegacySchemaId, getDidIndyCredentialDefinitionId } from '@aries-framework/indy-vdr/build/anoncreds/utils/identifiers'
 @Controller('/agent/command/credential-definition')
 export class CredentialDefinitionController extends BaseController {
   public constructor(testHarnessConfig: TestHarnessConfig) {
@@ -16,12 +16,19 @@ export class CredentialDefinitionController extends BaseController {
     @PathParams('credentialDefinitionId') credentialDefinitionId: string
   ): Promise<ReturnedCredentialDefinition> {
     try {
-      const { credentialDefinition } = await this.agent.modules.anoncreds.getCredentialDefinition(credentialDefinitionId)
+      // Convert to fully qualified credentialDefinitionId if a legacy credentialDefinitionId was provided (current AATH behaviour)
+      const { namespaceIdentifier, schemaSeqNo, tag, namespace } = parseCredentialDefinitionId(credentialDefinitionId)
+      const didIndyCredentialDefinitionId = getDidIndyCredentialDefinitionId(namespace ?? 'main-pool', namespaceIdentifier, schemaSeqNo, tag)
+
+      const { credentialDefinition } = await this.agent.modules.anoncreds.getCredentialDefinition(didIndyCredentialDefinitionId)
 
       if (!credentialDefinition) {
         throw new NotFound(`credential definition with credentialDefinitionId "${credentialDefinitionId}" not found.`)
       }
-      return { ...credentialDefinition, id: credentialDefinitionId }
+
+      const { schemaName, schemaVersion } = parseSchemaId(credentialDefinition.schemaId)
+
+      return { ...credentialDefinition, schemaId: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion), id: credentialDefinitionId }
     } catch (error) {
       // Credential definition does not exist on ledger
       if (error instanceof NotFound) {
@@ -51,12 +58,19 @@ export class CredentialDefinitionController extends BaseController {
 
     // Check locally if credential definition already exists
     const credentialDefinitionRepository = this.agent.dependencyManager.resolve(AnonCredsCredentialDefinitionRepository)
-    const [credentialDefinitionRecord] = await credentialDefinitionRepository.findByQuery(this.agent.context, { schemaId: data.schema_id, tag: data.tag })
+    const [credentialDefinitionRecord] = await credentialDefinitionRepository.findByQuery(this.agent.context, { 
+      schemaId: data.schema_id, tag: data.tag })
     if (credentialDefinitionRecord) {
 
+      // Use legacy schema/cred def id identifier, as currently AATH does not support querying full did:indy identifiers
+      const { namespaceIdentifier, schemaSeqNo, tag }= parseCredentialDefinitionId(credentialDefinitionRecord.credentialDefinitionId)
+      const { schemaName, schemaVersion } = parseSchemaId(credentialDefinitionRecord.credentialDefinition.schemaId)
+
       return {
-        credential_definition_id: credentialDefinitionRecord.credentialDefinitionId,
-        credential_definition: { ...credentialDefinitionRecord.credentialDefinition, id: credentialDefinitionRecord.credentialDefinitionId },
+        credential_definition_id: getLegacyCredentialDefinitionId(namespaceIdentifier, schemaSeqNo, tag),
+        credential_definition: { ...credentialDefinitionRecord.credentialDefinition, 
+          id: getLegacyCredentialDefinitionId(namespaceIdentifier, schemaSeqNo, tag), 
+          schemaId: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion) },
       }
     }
 
@@ -86,9 +100,16 @@ export class CredentialDefinitionController extends BaseController {
         throw new Error()
       }
       
+      const { namespaceIdentifier, schemaSeqNo, tag }= parseCredentialDefinitionId(credentialDefinitionState.credentialDefinitionId)
+
+      // Use legacy schema id identifier, as currently AATH does not support querying full did:indy identifiers
+      const { schemaName, schemaVersion } = parseSchemaId(credentialDefinitionState.credentialDefinition.schemaId)
+
       return {
-        credential_definition_id: credentialDefinitionState.credentialDefinitionId,
-        credential_definition: { ...credentialDefinitionState.credentialDefinition, id: credentialDefinitionState.credentialDefinitionId },
+        credential_definition_id: getLegacyCredentialDefinitionId(namespaceIdentifier, schemaSeqNo, tag),
+        credential_definition: { ...credentialDefinitionState.credentialDefinition, 
+          id: getLegacyCredentialDefinitionId(namespaceIdentifier, schemaSeqNo, tag), 
+          schemaId: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion) },
       }
     } catch (error: any) {
       throw new InternalServerError(`Error registering credential definition: ${error.message}`, error)

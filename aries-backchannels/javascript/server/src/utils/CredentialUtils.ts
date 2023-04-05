@@ -1,5 +1,5 @@
 import { Agent, CredentialRepository } from '@aries-framework/core'
-import { AnonCredsCredentialInfo, AnonCredsCredentialRepository, AnonCredsHolderService, AnonCredsHolderServiceSymbol } from '@aries-framework/anoncreds'
+import { AnonCredsHolderService, AnonCredsHolderServiceSymbol } from '@aries-framework/anoncreds'
 
 export class CredentialUtils {
   public static async getCredentialByThreadId(agent: Agent, threadId: string) {

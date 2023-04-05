@@ -4,6 +4,7 @@ import { Controller, Get, PathParams, Post, BodyParams } from '@tsed/common'
 import { InternalServerError, NotFound } from '@tsed/exceptions'
 import { BaseController } from '../BaseController'
 import { TestHarnessConfig } from '../TestHarnessConfig'
+import { parseSchemaId, getLegacySchemaId, getDidIndySchemaId } from '@aries-framework/indy-vdr/build/anoncreds/utils/identifiers'
 
 @Controller('/agent/command/schema')
 export class SchemaController extends BaseController {
@@ -18,11 +19,16 @@ export class SchemaController extends BaseController {
   @Get('/:schemaId')
   async getSchemaById(@PathParams('schemaId') schemaId: string): Promise<ReturnedSchema> {
     try {
-      const { schema } = await this.agent.modules.anoncreds.getSchema(schemaId)
+      // Convert to fully qualified schemaId if a legacy schemaId was provided (current AATH behaviour)
+      const { namespaceIdentifier, schemaName, schemaVersion, namespace } = parseSchemaId(schemaId)
+      const didIndySchemaId = getDidIndySchemaId(namespace ?? 'main-pool', namespaceIdentifier, schemaName, schemaVersion)
+
+      const { schema } = await this.agent.modules.anoncreds.getSchema(didIndySchemaId)
 
       if (!schema) {
         throw new NotFound(`schema with schemaId "${schemaId}" not found.`)
       }
+
       return { ...schema, id: schemaId }
     } catch (error: any) {
       // Schema does not exist on ledger
@@ -42,13 +48,12 @@ export class SchemaController extends BaseController {
     const [schemaRecord] = await schemaRepository.findByQuery(this.agent.context, { schemaName: data.schema_name, 
       schemaVersion: data.schema_version })
     if (schemaRecord) {
-
+      const { namespaceIdentifier, schemaName, schemaVersion } = parseSchemaId(schemaRecord.schemaId)
       return {
-        schema_id: schemaRecord.schemaId,
-        schema: { ...schemaRecord.schema, id: schemaRecord.schemaId },
+        schema_id: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion),
+        schema: { ...schemaRecord.schema, id: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion) },
       }
     }
-  
     const publicDidInfoRecord = await this.agent.genericRecords.findById('PUBLIC_DID_INFO')
     
     if (!publicDidInfoRecord) {
@@ -70,9 +75,11 @@ export class SchemaController extends BaseController {
       throw new Error(`Schema could not be registered: ${JSON.stringify(schema.schemaState)}}`) // TODO
     }
 
+    const { namespaceIdentifier, schemaName, schemaVersion } = parseSchemaId(schema.schemaState.schemaId)
+
     return {
-      schema_id: schema.schemaState.schemaId,
-      schema: { ...schema.schemaState.schema, id: schema.schemaState.schemaId },
+      schema_id: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion),
+      schema: { ...schema.schemaState.schema, id: getLegacySchemaId(namespaceIdentifier, schemaName, schemaVersion) },
     }
   }
 }

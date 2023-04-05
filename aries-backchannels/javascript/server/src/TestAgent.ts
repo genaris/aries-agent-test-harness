@@ -4,8 +4,8 @@ import { agentDependencies } from '@aries-framework/node'
 import { AskarModule } from '@aries-framework/askar'
 import { AnonCredsModule, LegacyIndyCredentialFormatService, LegacyIndyProofFormatService,  V1CredentialProtocol, V1ProofProtocol } from '@aries-framework/anoncreds'
 import { AnonCredsRsModule } from '@aries-framework/anoncreds-rs'
-import { IndyVdrAnonCredsRegistry, IndyVdrModule, IndyVdrSovDidResolver, IndyVdrPoolConfig } from '@aries-framework/indy-vdr'
-import { IndySdkAnonCredsRegistry, IndySdkModule, IndySdkSovDidResolver, IndySdkPoolConfig } from '@aries-framework/indy-sdk'
+import { IndyVdrAnonCredsRegistry, IndyVdrModule, IndyVdrSovDidResolver, IndyVdrPoolConfig, IndyVdrIndyDidResolver } from '@aries-framework/indy-vdr'
+import { IndySdkAnonCredsRegistry, IndySdkModule, IndySdkSovDidResolver, IndySdkPoolConfig, IndySdkIndyDidResolver } from '@aries-framework/indy-sdk'
 import { TsedLogger } from './TsedLogger'
 import { TransportConfig } from './TestHarnessConfig'
 import indySdk from 'indy-sdk'
@@ -117,7 +117,7 @@ export function getAskarAnonCredsIndyModules(indyNetworkConfig: IndyVdrPoolConfi
       networks: [indyNetworkConfig],
     }),
     dids: new DidsModule({
-      resolvers: [new IndyVdrSovDidResolver()],
+      resolvers: [new IndyVdrSovDidResolver(), new IndyVdrIndyDidResolver()],
     }),
     askar: new AskarModule({ ariesAskar }),
   } as const
@@ -162,7 +162,7 @@ function getLegacyIndySdkModules(indyNetworkConfig: IndySdkPoolConfig) {
       networks: [indyNetworkConfig],
     }),
     dids: new DidsModule({
-      resolvers: [new IndySdkSovDidResolver()],
+      resolvers: [new IndySdkSovDidResolver(), new IndySdkIndyDidResolver()],
     }),
   } as const
 }

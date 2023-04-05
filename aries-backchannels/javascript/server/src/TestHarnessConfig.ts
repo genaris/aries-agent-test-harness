@@ -61,7 +61,7 @@ export class TestHarnessConfig {
     const key = await this._agent.context.wallet.createKey({keyType: KeyType.Ed25519, privateKey: TypedArrayEncoder.fromString(agentArgs.publicDidSeed)})
 
     const didInfo = {
-      did: indyDidFromPublicKeyBase58(key.publicKeyBase58),
+      did: `did:indy:main-pool:${indyDidFromPublicKeyBase58(key.publicKeyBase58)}`,
       verkey: key.publicKeyBase58
     }
     await this.agent.genericRecords.save({ content: { didInfo }, id: 'PUBLIC_DID_INFO' })
